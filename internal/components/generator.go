@@ -122,7 +122,7 @@ func (g *Generator) Generate(ctx context.Context, opts GenerateOptions) (Generat
 func (g *Generator) GetSupportedTypes() []string {
 	return []string{
 		"handler",
-		"model", 
+		"model",
 		"service",
 		"migration",
 		"middleware",
@@ -200,11 +200,11 @@ func (g *Generator) prepareVariables(opts GenerateOptions) map[string]any {
 // getComponentTemplates returns templates for a specific component type
 func (g *Generator) getComponentTemplates(componentType string) ([]ComponentTemplate, error) {
 	templates := getComponentTemplates()
-	
+
 	if componentTemplates, exists := templates[componentType]; exists {
 		return componentTemplates, nil
 	}
-	
+
 	return nil, fmt.Errorf("no templates found for component type '%s'", componentType)
 }
 
@@ -217,7 +217,7 @@ func toTitleCase(s string) string {
 	words := strings.FieldsFunc(s, func(r rune) bool {
 		return r == '_' || r == '-' || r == ' '
 	})
-	
+
 	for i, word := range words {
 		if len(word) > 0 {
 			words[i] = strings.ToUpper(word[:1]) + strings.ToLower(word[1:])
@@ -231,7 +231,7 @@ func toCamelCase(s string) string {
 	if len(parts) == 1 {
 		parts = strings.Split(s, "-")
 	}
-	
+
 	result := strings.ToLower(parts[0])
 	for i := 1; i < len(parts); i++ {
 		if len(parts[i]) > 0 {

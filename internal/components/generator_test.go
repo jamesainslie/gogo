@@ -98,32 +98,32 @@ func TestComponentGenerator_GenerateHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := generator.Generate(ctx, tt.opts)
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 				return
 			}
-			
+
 			require.NoError(t, err)
 			assert.True(t, result.Success)
 			assert.GreaterOrEqual(t, result.FilesCreated, len(tt.expectFiles))
-			
+
 			// Verify expected files exist and have content
 			for _, expectedFile := range tt.expectFiles {
 				filePath := filepath.Join(tt.opts.OutputDir, expectedFile)
 				_, err := os.Stat(filePath)
 				assert.NoError(t, err, "file %s should exist", expectedFile)
-				
+
 				content, err := os.ReadFile(filePath)
 				require.NoError(t, err)
 				assert.NotEmpty(t, content, "file %s should not be empty", expectedFile)
-				
+
 				contentStr := string(content)
 				// Verify basic structure (migrations don't have package declarations)
 				if tt.opts.Type != "migration" {
 					assert.Contains(t, contentStr, "package", "file should have package declaration")
 				}
-				
+
 				// Verify name substitution
 				if tt.opts.Name != "" {
 					assert.Contains(t, contentStr, tt.opts.Name, "file should contain component name")
@@ -208,14 +208,14 @@ func TestComponentGenerator_ValidateOptions(t *testing.T) {
 
 func TestComponentGenerator_GetSupportedTypes(t *testing.T) {
 	generator := NewGenerator()
-	
+
 	types := generator.GetSupportedTypes()
-	
+
 	// Should have at least these core types
 	expectedTypes := []string{"handler", "model", "service", "migration", "middleware", "test"}
-	
+
 	assert.GreaterOrEqual(t, len(types), len(expectedTypes))
-	
+
 	for _, expectedType := range expectedTypes {
 		assert.Contains(t, types, expectedType, "should support %s component type", expectedType)
 	}
@@ -235,11 +235,11 @@ func TestComponentGenerator_DryRun(t *testing.T) {
 
 	result, err := generator.Generate(ctx, opts)
 	require.NoError(t, err)
-	
+
 	// Should return success but not create files
 	assert.True(t, result.Success)
 	assert.Greater(t, result.FilesCreated, 0) // Should report files that would be created
-	
+
 	// Verify no files were actually created
 	entries, err := os.ReadDir(tempDir)
 	require.NoError(t, err)
