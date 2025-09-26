@@ -44,17 +44,17 @@ func TestBlueprint_Resolve(t *testing.T) {
 				"ModuleName":  "github.com/user/myapi",
 			},
 			expected: map[string]any{
-				"ProjectName": "myapi",
-				"ModuleName":  "github.com/user/myapi",
-				"Components":  []string{"gin", "gorm", "viper"},
-				"HasDatabase": true,
-				"DatabaseType": "postgres",
+				"ProjectName":   "myapi",
+				"ModuleName":    "github.com/user/myapi",
+				"Components":    []string{"gin", "gorm", "viper"},
+				"HasDatabase":   true,
+				"DatabaseType":  "postgres",
 				"HasMigrations": true,
 				"MigrationType": "goose",
 				"HasPrometheus": true,
-				"LoggingType": "slog",
+				"LoggingType":   "slog",
 				"TestFramework": "testify",
-				"CoverageMin": 0.80,
+				"CoverageMin":   0.80,
 			},
 			wantErr: false,
 		},
@@ -75,10 +75,10 @@ func TestBlueprint_Resolve(t *testing.T) {
 				"ModuleName":  "github.com/user/mycli",
 			},
 			expected: map[string]any{
-				"ProjectName": "mycli",
-				"ModuleName":  "github.com/user/mycli",
-				"Components":  []string{"cobra", "viper"},
-				"HasDatabase": false,
+				"ProjectName":   "mycli",
+				"ModuleName":    "github.com/user/mycli",
+				"Components":    []string{"cobra", "viper"},
+				"HasDatabase":   false,
 				"TestFramework": "testify",
 			},
 			wantErr: false,
@@ -103,7 +103,7 @@ func TestBlueprint_Resolve(t *testing.T) {
 				"ProjectName": "mygrpc",
 				"ModuleName":  "github.com/user/mygrpc",
 				"Components":  []string{"grpc", "protobuf"},
-				"HasTracing": true,
+				"HasTracing":  true,
 				"TracingType": "jaeger",
 				"HasDatabase": false,
 			},
@@ -115,14 +115,14 @@ func TestBlueprint_Resolve(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			resolver := NewResolver()
 			result, err := resolver.Resolve(context.Background(), tt.blueprint, tt.inputs)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
 			}
-			
+
 			require.NoError(t, err)
-			
+
 			// Check that all expected keys are present with correct values
 			for key, expectedValue := range tt.expected {
 				actualValue, exists := result[key]
@@ -177,7 +177,7 @@ func TestBlueprintRepository_GetBlueprint(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			blueprint, err := repo.GetBlueprint(ctx, tt.blueprintID)
-			
+
 			if tt.expectFound {
 				require.NoError(t, err)
 				assert.Equal(t, tt.blueprintID, blueprint.Name)
@@ -217,10 +217,10 @@ func TestBlueprintRepository_GetBlueprintsByStack(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name         string
-		stack        string
-		expectCount  int
-		expectNames  []string
+		name        string
+		stack       string
+		expectCount int
+		expectNames []string
 	}{
 		{
 			name:        "web stack blueprints",
@@ -252,15 +252,15 @@ func TestBlueprintRepository_GetBlueprintsByStack(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			blueprints, err := repo.GetBlueprintsByStack(ctx, tt.stack)
 			require.NoError(t, err)
-			
+
 			assert.Len(t, blueprints, tt.expectCount)
-			
+
 			if tt.expectCount > 0 {
 				actualNames := make([]string, len(blueprints))
 				for i, bp := range blueprints {
 					actualNames[i] = bp.Name
 				}
-				
+
 				for _, expectedName := range tt.expectNames {
 					assert.Contains(t, actualNames, expectedName)
 				}

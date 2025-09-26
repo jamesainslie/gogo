@@ -7,13 +7,13 @@ import (
 
 // BlueprintConfig represents the configuration for a blueprint
 type BlueprintConfig struct {
-	Components    []string               `json:"components"`
-	Database      map[string]any         `json:"database,omitempty"`
-	Observability map[string]any         `json:"observability,omitempty"`
-	Testing       map[string]any         `json:"testing,omitempty"`
-	CI            map[string]any         `json:"ci,omitempty"`
-	Docker        map[string]any         `json:"docker,omitempty"`
-	Extra         map[string]any         `json:"extra,omitempty"`
+	Components    []string       `json:"components"`
+	Database      map[string]any `json:"database,omitempty"`
+	Observability map[string]any `json:"observability,omitempty"`
+	Testing       map[string]any `json:"testing,omitempty"`
+	CI            map[string]any `json:"ci,omitempty"`
+	Docker        map[string]any `json:"docker,omitempty"`
+	Extra         map[string]any `json:"extra,omitempty"`
 }
 
 // Blueprint represents a stack blueprint
@@ -247,10 +247,10 @@ func (r *Repository) initPredefinedBlueprints() {
 				"coverage_min": 0.85,
 			},
 			Docker: map[string]any{
-				"base_image":     "golang:1.25.1",
-				"expose":         8080,
-				"health_check":   true,
-				"multi_stage":    true,
+				"base_image":   "golang:1.25.1",
+				"expose":       8080,
+				"health_check": true,
+				"multi_stage":  true,
 			},
 		},
 	}
