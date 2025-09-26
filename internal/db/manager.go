@@ -50,6 +50,11 @@ func (m *Manager) Close() error {
 	return nil
 }
 
+// GetDB returns the underlying database connection
+func (m *Manager) GetDB() *sql.DB {
+	return m.db
+}
+
 // WithTx executes a function within a transaction
 func (m *Manager) WithTx(ctx context.Context, fn func(ctx context.Context, tx *sql.Tx) error) error {
 	tx, err := m.db.BeginTx(ctx, nil)
