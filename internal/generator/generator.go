@@ -6,24 +6,30 @@ import (
 	"path/filepath"
 
 	"github.com/user/gogo/internal/blueprints"
+	"github.com/user/gogo/internal/cicd"
+	"github.com/user/gogo/internal/git"
 	"github.com/user/gogo/internal/templates"
 	"github.com/user/gogo/internal/validate"
 )
 
 // InitOptions contains options for project initialization
 type InitOptions struct {
-	ProjectName string
-	ModuleName  string
-	Template    string
-	Blueprint   string // Blueprint name for enhanced stack support
-	Author      string
-	License     string
-	GoVersion   string
-	OutputDir   string
-	Description string
-	GitInit     bool
-	Force       bool
-	DryRun      bool
+	ProjectName          string
+	ModuleName           string
+	Template             string
+	Blueprint            string // Blueprint name for enhanced stack support
+	Author               string
+	Email                string // Author email for git configuration
+	License              string
+	GoVersion            string
+	OutputDir            string
+	Description          string
+	GitInit              bool
+	GenerateCI           bool    // Generate CI/CD configurations
+	CoverageMin          float64 // Minimum test coverage percentage
+	InitialCommitMessage string  // Custom initial commit message
+	Force                bool
+	DryRun               bool
 }
 
 // Result contains the result of a generation operation
@@ -162,7 +168,22 @@ func (g *Generator) InitProject(ctx context.Context, opts InitOptions) (Result, 
 		}
 	}
 
-	result.Message = fmt.Sprintf("Created %d files in %s", len(templateFiles), opts.OutputDir)
+	// Generate CI/CD configurations if requested
+	if opts.GenerateCI {
+		if err := g.generateCICD(ctx, opts, variables); err != nil {
+			return Result{}, fmt.Errorf("failed to generate CI/CD configurations: %w", err)
+		}
+		result.FilesCreated += 3 // .golangci.yml, ci.yml, .pre-commit-config.yaml
+	}
+
+	// Initialize git repository if requested
+	if opts.GitInit {
+		if err := g.initializeGit(ctx, opts); err != nil {
+			return Result{}, fmt.Errorf("failed to initialize git repository: %w", err)
+		}
+	}
+
+	result.Message = g.buildResultMessage(opts, len(templateFiles))
 	return result, nil
 }
 
@@ -210,4 +231,114 @@ func (g *Generator) validateOptions(opts InitOptions) error {
 	}
 
 	return nil
+}
+
+// generateCICD generates CI/CD configuration files
+func (g *Generator) generateCICD(ctx context.Context, opts InitOptions, variables map[string]any) error {
+	// Set defaults for CI/CD generation
+	generateCI := opts.GenerateCI
+	if !generateCI && opts.GitInit {
+		// If GitInit is enabled, auto-enable CI generation
+		generateCI = true
+	}
+
+	if !generateCI {
+		return nil
+	}
+
+	// Determine if project has database based on blueprint
+	hasDatabase := false
+	databaseType := ""
+	if opts.Blueprint != "" {
+		blueprint, err := g.blueprintRepository.GetBlueprint(ctx, opts.Blueprint)
+		if err == nil {
+			if len(blueprint.Config.Database) > 0 {
+				hasDatabase = true
+				if dbType, ok := blueprint.Config.Database["type"].(string); ok {
+					databaseType = dbType
+				}
+			}
+		}
+	}
+
+	// Set default coverage minimum
+	coverageMin := opts.CoverageMin
+	if coverageMin == 0 {
+		coverageMin = 0.80 // Default to 80%
+	}
+
+	// Create CI/CD configuration
+	cicdConfig := cicd.Config{
+		ProjectName:   opts.ProjectName,
+		GoVersion:     opts.GoVersion,
+		CoverageMin:   coverageMin,
+		TestFramework: "testify", // Default framework
+		HasDatabase:   hasDatabase,
+		DatabaseType:  databaseType,
+		HasDocker:     false, // TODO: Determine from blueprint in future
+		LintTimeout:   "5m",
+		BuildTargets:  []string{"linux", "darwin", "windows"},
+	}
+
+	// Generate CI/CD files
+	cicdGenerator := cicd.NewGenerator()
+	return cicdGenerator.GenerateAll(ctx, opts.OutputDir, cicdConfig)
+}
+
+// initializeGit initializes a git repository with initial commit
+func (g *Generator) initializeGit(ctx context.Context, opts InitOptions) error {
+	if !git.IsGitInstalled() {
+		return fmt.Errorf("git is not installed or not available in PATH")
+	}
+
+	gitManager := git.NewGitManager(opts.OutputDir)
+
+	// Validate working directory
+	if err := gitManager.ValidateWorkingDir(); err != nil {
+		return fmt.Errorf("git working directory validation failed: %w", err)
+	}
+
+	// Get email if not provided
+	email := opts.Email
+	if email == "" {
+		// Try to get email from git config
+		_, gitEmail := git.GetUserInfo(ctx)
+		if gitEmail != "" {
+			email = gitEmail
+		}
+	}
+
+	// Initialize git repository
+	gitOpts := git.InitOptions{
+		ProjectName:          opts.ProjectName,
+		Author:               opts.Author,
+		Email:                email,
+		InitialCommitMessage: opts.InitialCommitMessage,
+	}
+
+	if err := gitManager.Init(ctx, gitOpts); err != nil {
+		return fmt.Errorf("git init failed: %w", err)
+	}
+
+	// Create initial commit
+	if err := gitManager.InitialCommit(ctx, gitOpts); err != nil {
+		return fmt.Errorf("initial commit failed: %w", err)
+	}
+
+	return nil
+}
+
+// buildResultMessage builds the result message based on what was generated
+func (g *Generator) buildResultMessage(opts InitOptions, templateFilesCount int) string {
+	message := fmt.Sprintf("Created %d files in %s", templateFilesCount, opts.OutputDir)
+
+	if opts.GenerateCI {
+		message += "\nGenerated CI/CD configurations (.golangci.yml, GitHub Actions, pre-commit hooks)"
+	}
+
+	if opts.GitInit {
+		message += "\nInitialized git repository with initial commit"
+	}
+
+	return message
 }

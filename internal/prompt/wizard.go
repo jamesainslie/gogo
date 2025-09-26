@@ -15,16 +15,20 @@ import (
 
 // WizardOptions contains the results from the interactive wizard
 type WizardOptions struct {
-	ProjectName string
-	ModuleName  string
-	Template    string
-	Blueprint   string
-	Author      string
-	License     string
-	GoVersion   string
-	OutputDir   string
-	GitInit     bool
-	Force       bool
+	ProjectName          string
+	ModuleName           string
+	Template             string
+	Blueprint            string
+	Author               string
+	Email                string
+	License              string
+	GoVersion            string
+	OutputDir            string
+	GitInit              bool
+	GenerateCI           bool
+	CoverageMin          float64
+	InitialCommitMessage string
+	Force                bool
 }
 
 // Wizard provides interactive prompts for project initialization
@@ -94,6 +98,11 @@ func (w *Wizard) RunInitWizard(ctx context.Context, initialOptions generator.Ini
 		}
 	}
 
+	// Author email (optional)
+	if err := w.promptEmail(options); err != nil {
+		return nil, err
+	}
+
 	// License
 	if options.License == "" || options.License == "MIT" {
 		if err := w.promptLicense(options); err != nil {
@@ -118,6 +127,20 @@ func (w *Wizard) RunInitWizard(ctx context.Context, initialOptions generator.Ini
 	// Git initialization
 	if err := w.promptGitInit(options); err != nil {
 		return nil, err
+	}
+
+	// CI/CD configuration (if git is enabled)
+	if options.GitInit {
+		if err := w.promptCICD(options); err != nil {
+			return nil, err
+		}
+
+		// Coverage minimum (if CI/CD is enabled)
+		if options.GenerateCI {
+			if err := w.promptCoverageMin(options); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	// Force overwrite
@@ -409,10 +432,19 @@ func (w *Wizard) showSummary(options *WizardOptions) {
 		fmt.Printf("  Blueprint:    %s\n", options.Blueprint)
 	}
 	fmt.Printf("  Author:       %s\n", options.Author)
+	if options.Email != "" {
+		fmt.Printf("  Email:        %s\n", options.Email)
+	}
 	fmt.Printf("  License:      %s\n", options.License)
 	fmt.Printf("  Go Version:   %s\n", w.displayGoVersion(options.GoVersion))
 	fmt.Printf("  Output Dir:   %s\n", options.OutputDir)
 	fmt.Printf("  Git Init:     %t\n", options.GitInit)
+	if options.GitInit && options.GenerateCI {
+		fmt.Printf("  Generate CI:  %t\n", options.GenerateCI)
+		if options.CoverageMin > 0 {
+			fmt.Printf("  Coverage Min: %.0f%%\n", options.CoverageMin*100)
+		}
+	}
 	if options.Force {
 		fmt.Printf("  Force:        %t\n", options.Force)
 	}
@@ -456,20 +488,121 @@ func (w *Wizard) getGitUserName() string {
 	return ""
 }
 
+func (w *Wizard) promptEmail(options *WizardOptions) error {
+	// Try to get default from git config
+	defaultEmail := w.getGitUserEmail()
+
+	prompt := promptui.Prompt{
+		Label:   "Author email (optional)",
+		Default: defaultEmail,
+	}
+
+	result, err := prompt.Run()
+	if err != nil {
+		return fmt.Errorf("email prompt failed: %w", err)
+	}
+
+	options.Email = result
+	return nil
+}
+
+func (w *Wizard) promptCICD(options *WizardOptions) error {
+	prompt := promptui.Select{
+		Label: "Generate CI/CD configurations (.golangci.yml, GitHub Actions, pre-commit hooks)?",
+		Items: []string{"Yes", "No"},
+	}
+
+	i, _, err := prompt.Run()
+	if err != nil {
+		return fmt.Errorf("CI/CD prompt failed: %w", err)
+	}
+
+	options.GenerateCI = i == 0 // 0 = "Yes", 1 = "No"
+	return nil
+}
+
+func (w *Wizard) promptCoverageMin(options *WizardOptions) error {
+	coverageOptions := []string{"80%", "75%", "85%", "90%", "Custom"}
+
+	prompt := promptui.Select{
+		Label: "Minimum test coverage percentage",
+		Items: coverageOptions,
+	}
+
+	i, _, err := prompt.Run()
+	if err != nil {
+		return fmt.Errorf("coverage prompt failed: %w", err)
+	}
+
+	switch i {
+	case 0: // 80%
+		options.CoverageMin = 0.80
+	case 1: // 75%
+		options.CoverageMin = 0.75
+	case 2: // 85%
+		options.CoverageMin = 0.85
+	case 3: // 90%
+		options.CoverageMin = 0.90
+	case 4: // Custom
+		customPrompt := promptui.Prompt{
+			Label:    "Enter coverage percentage (0-100)",
+			Default:  "80",
+			Validate: w.validateCoveragePercentage,
+		}
+
+		customResult, err := customPrompt.Run()
+		if err != nil {
+			return fmt.Errorf("custom coverage prompt failed: %w", err)
+		}
+
+		// Parse percentage
+		var percentage float64
+		if _, err := fmt.Sscanf(customResult, "%f", &percentage); err != nil {
+			return fmt.Errorf("invalid coverage percentage: %w", err)
+		}
+		options.CoverageMin = percentage / 100.0
+	}
+
+	return nil
+}
+
+func (w *Wizard) validateCoveragePercentage(input string) error {
+	var percentage float64
+	if _, err := fmt.Sscanf(input, "%f", &percentage); err != nil {
+		return fmt.Errorf("must be a number")
+	}
+	if percentage < 0 || percentage > 100 {
+		return fmt.Errorf("must be between 0 and 100")
+	}
+	return nil
+}
+
+func (w *Wizard) getGitUserEmail() string {
+	// Try to get git user email from environment or git config
+	if email := os.Getenv("GIT_AUTHOR_EMAIL"); email != "" {
+		return email
+	}
+	return ""
+}
+
 // ConvertToInitOptions converts wizard options to generator InitOptions
 func (w *WizardOptions) ConvertToInitOptions() generator.InitOptions {
 	return generator.InitOptions{
-		ProjectName: w.ProjectName,
-		ModuleName:  w.ModuleName,
-		Template:    w.Template,
-		Blueprint:   w.Blueprint,
-		Author:      w.Author,
-		License:     w.License,
-		GoVersion:   w.GoVersion,
-		OutputDir:   w.OutputDir,
-		Description: fmt.Sprintf("A %s project", w.Template),
-		GitInit:     w.GitInit,
-		Force:       w.Force,
-		DryRun:      false, // Wizard doesn't support dry-run mode
+		ProjectName:          w.ProjectName,
+		ModuleName:           w.ModuleName,
+		Template:             w.Template,
+		Blueprint:            w.Blueprint,
+		Author:               w.Author,
+		Email:                w.Email,
+		License:              w.License,
+		GoVersion:            w.GoVersion,
+		OutputDir:            w.OutputDir,
+		Description:          fmt.Sprintf("A %s project", w.Template),
+		GitInit:              w.GitInit,
+		GenerateCI:           w.GenerateCI,
+		CoverageMin:          w.CoverageMin,
+		InitialCommitMessage: w.InitialCommitMessage,
+		Force:                w.Force,
+		DryRun:               false, // Wizard doesn't support dry-run mode
 	}
 }
