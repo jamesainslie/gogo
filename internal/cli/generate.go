@@ -37,7 +37,7 @@ Examples:
 
 			color.Yellow("Generating component: %s", componentType)
 			color.Yellow("Name: %s", name)
-			
+
 			result, err := generator.Generate(cmd.Context(), opts)
 			if err != nil {
 				return fmt.Errorf("failed to generate component: %w", err)
